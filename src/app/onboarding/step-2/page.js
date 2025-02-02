@@ -1,17 +1,26 @@
+// src/app/onboarding/step-2/page.js
 "use client";
 
 import { useState } from "react";
 import { useFormContext } from "../context";
 import MultiSelectInput from "@/components/MultiSelectInput";
 import MoneyInput from "@/components/MoneyInput";
-import Link from "next/link";
+import NormalMultiSelect from "@/components/NormalMultiSelect";
+import { industryList } from "@/data/portfolio/industry";
+import InfoNormalMultiSelect from "@/components/InfoNormalMultiSelect";
+
+// export const dynamic = 'force-dynamic';
+
 export default function Step2() {
-  const { formData, updateFormData } = useFormContext();
-
-  const industryOptions = ["Design", "Marketing", "Development", "Product", "Sales", "Human Resources"];
+  const { formData, updateFormData, isSaving } = useFormContext();
   const contentOptions = ["Story", "Reels", "Posts"];
-  const compensationOptions = ["Gifting", "Sponsorships", "Affiliate"];
+  const compensationOptions = ["Gifting", "Sponsorships", "Affiliate", "Hosted", "Collaboration"];
+  const languageList = [
+    "English", "Spanish", "French", "German", "Mandarin", "Hindi", "Japanese", "Marathi", "Gujarati", "Tamil", "Telugu", "Bengali", "Portuguese", "Italian", "Russian", "Arabic", "Korean", "Vietnamese", "Indonesian", "Turkish", "Urdu"
+  ];
 
+
+  console.log("saving", isSaving) //undefined
   // Handle changes for a specific field
   const handleAddValue = (fieldName, value) => {
     const updatedValues = [...(formData[fieldName] || []), value];
@@ -21,50 +30,59 @@ export default function Step2() {
   const handleRemoveValue = (fieldName, value) => {
     const updatedValues = (formData[fieldName] || []).filter((item) => item !== value);
     updateFormData({ [fieldName]: updatedValues });
-    console.log('remove click ')
+
   };
 
   return (
-    <form className="w-full h-[100vh] overflow-hidden mx-auto space-y-6">
-      <h2 className="text-2xl mt-10">And we&apos;re almost there!</h2>
-      <div className="flex flex-row gap-6">
+    <div>
+    <h2 className="text-3xl mt-10 font-qimano">And we&apos;re almost there!</h2>
+    <form className="w-full xl:w-[726px] 5xl:w-[800px] h-[80vh] overflow-y-scroll mx-auto space-y-6 font-apfel-grotezk-regular mt-6"    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+
         <MultiSelectInput
-          label="Choose Industry"
-          options={industryOptions}
+          label="Choose Industry (Max 5)"
+          data={industryList}
           selectedValues={formData.industry || []}
           onAddValue={(value) => handleAddValue("industry", value)}
           onRemoveValue={(value) => handleRemoveValue("industry", value)}
         />
-      </div>
-      <MultiSelectInput
+
+      <NormalMultiSelect  
         label="Choose Content Type"
         options={contentOptions}
         selectedValues={formData.contentType || []}
         onAddValue={(value) => handleAddValue("contentType", value)}
-        onRemoveValue={(value) => handleRemoveValue("contentType", value)}
-      />
+        onRemoveValue={(value) => handleRemoveValue("contentType", value)}/>
+
       <MultiSelectInput
+        label="Choose Languages (Max 5)"
+        data={languageList}
+        selectedValues={formData.languages || []}
+        onAddValue={(value) => handleAddValue("languages", value)}
+        onRemoveValue={(value) => handleRemoveValue("languages", value)}
+      />
+
+
+      <InfoNormalMultiSelect
         label="Choose Compensation"
         options={compensationOptions}
         selectedValues={formData.compensation || []}
         onAddValue={(value) => handleAddValue("compensation", value)}
-        onRemoveValue={(value) => handleRemoveValue("compensation", value)}
-      />
+        onRemoveValue={(value) => handleRemoveValue("compensation", value)}/>
 
        <div className="space-x-0 flex flex-col">
         <h4 className="mb-5">Add pricing for your services</h4>
         <div className="flex flex-row gap-3">
-          <MoneyInput
-          title="Post"
-          placeholder="Enter amount"
-          value={formData.post}
-          onChange={(value) => updateFormData({ post: value })}
-        />
         <MoneyInput
           title="Story"
           placeholder="Enter amount"
           value={formData.story}
           onChange={(value) => updateFormData({ story: value })}
+        />
+          <MoneyInput
+          title="Post"
+          placeholder="Enter amount"
+          value={formData.post}
+          onChange={(value) => updateFormData({ post: value })}
         />
         <MoneyInput
           title="Reel"
@@ -74,13 +92,10 @@ export default function Step2() {
         />
 
         </div>
-
-        <Link href="/dashboard">
-      <button className="w-full sm:w-[156px] h-12 bg-[#0037EB] text-white rounded-lg mt-9">
-        Go to Dashboard
-      </button>
-    </Link>
         </div>
+
+        <div className="bg-transparent w-full h-24"></div>
     </form>
+    </div>
   );
 }

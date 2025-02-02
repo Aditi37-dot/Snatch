@@ -1,5 +1,11 @@
+// src/app/layout.js
 import localFont from "next/font/local";
 import "./globals.css";
+import {
+  ClerkProvider,
+  SignedIn,
+  SignedOut,
+} from '@clerk/nextjs'
 
 const apfelGrotezkMittel = localFont({
   src: [
@@ -41,6 +47,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
+    <ClerkProvider>
     <html lang="en">
       <body
         className={`${apfelGrotezkMittel.variable} ${apfelGrotezkRegular.variable} ${qimano.variable} antialiased`}
@@ -48,5 +55,6 @@ export default function RootLayout({ children }) {
         {children}
       </body>
     </html>
+    </ClerkProvider>
   );
 }

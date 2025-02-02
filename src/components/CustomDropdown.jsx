@@ -13,17 +13,19 @@ const CustomDropdown = ({ options, placeholder, onSelect, selected }) => {
   };
 
   return (
-    <div className="relative w-[568px]">
+    <div className="relative w-[369px]">
       {/* Display selected option or placeholder */}
       <div
-        className="rounded-lg border border-stroke bg-transparent py-[10px] px-5 text-graphite cursor-pointer"
+       className={`rounded-lg border border-stroke bg-transparent py-[10px] px-5 cursor-pointer ${
+        selected ? "text-graphite" : "text-gray-400"
+      }`}
         onClick={toggleDropdown}
       >
         {selected || placeholder}
       </div>
 
       {isOpen && (
-        <ul className="absolute mt-2 w-full rounded-lg border border-stroke bg-light-grey py-2 text-graphite">
+        <ul className="absolute mt-2 w-[300px] rounded-lg border border-stroke bg-[#E9E9E9] py-2 text-graphite">
           {options.map((option, index) => (
             <li
               key={index}

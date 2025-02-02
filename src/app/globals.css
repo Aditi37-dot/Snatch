@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "~slick-carousel/slick/slick.css";
+@import "~slick-carousel/slick/slick-theme.css";
+
+
 /* Default colors */
 :root {
   --lime-yellow: #E4EA00;
@@ -22,6 +26,19 @@
   --font-qimano: "Qimano-aYxdE", sans-serif;
 }
 
+.font-apfel-grotezk-regular {
+  font-family: var(--font-apfel-grotezk-regular);
+
+}
+
+.font-apfel-grotezk-mittel {
+  font-family: var(--font-apfel-grotezk-mittel);
+}
+
+.font-qimano {
+  font-family: var(--font-qimano);
+}
+
 
 /* dark mode  */
 @media (prefers-color-scheme: dark) {
@@ -38,9 +55,9 @@
 
 body {
   /* font-family: Arial, Helvetica, sans-serif; */
-  background-color: var(--smoke);
+  background-color: white;
   color: var(--graphite);
-   font-family: var(--font-qimano);
+  /* font-family: var(--font-qimano); */
 }
 
 

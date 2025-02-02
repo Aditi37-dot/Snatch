@@ -1,5 +1,8 @@
-"use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { debounce } from "lodash"; 
+import { useAuth } from "@clerk/clerk-react";
+import cloudinaryUpload from "@/utils/cloudinaryUpload";
+import deleteFormDataFromDatabase from "@/utils/deleteFormDataFromDatabase";
 
 // Context for selection state
 const SelectedProjectsContext = createContext();
@@ -10,155 +13,329 @@ export function useSelectedProjects() {
 
 // Provider component
 export function SelectedProjectsProvider({ children }) {
-  const [selectionState, setSelectionState] = useState(() => {
-    if (typeof window !== "undefined") {
-      const savedState = localStorage.getItem("selectionState");
-      return savedState ? JSON.parse(savedState) : {
-        uploadedFiles: [],
-        svgSelected: [],
-        formData: {},
-      };
-    }
-    return {
-      uploadedFiles: [],
-      svgSelected: [],
-      formData: {},
-    };
+  const { userId } = useAuth();
+  const [selectionState, setSelectionState] = useState({
+    uploadedFiles: [],
+    instagramSelected: [],
+    formData: {},
   });
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Update localStorage whenever selectionState changes
+  // Fetch draft data on initial load
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      console.log("Saving to localStorage:", selectionState); // Log before saving
-      localStorage.setItem("selectionState", JSON.stringify(selectionState));
-      const serializedData = JSON.stringify(selectionState);
-      console.log("Data size in bytes:", serializedData.length);
-    }
-  }, [selectionState]);
-  
+    const fetchDraftData = async () => {
+      try {
+        if (!userId) {
+          console.error("User ID is missing.");
+          return;
+        }
 
-  // Helper update function to update selectionState
-  const updateSelectionState = (updater) => {
-    console.log("Updating selectionState with updater:", updater);
-  
-    setSelectionState((prevState) => {
-      const updatedState =
-        typeof updater === "function" ? updater(prevState) : { ...prevState, ...updater };
-  
-      console.log("Updated selectionState:", updatedState);
-  
-      // Save updated state to localStorage
-      if (typeof window !== "undefined") {
-        localStorage.setItem("selectionState", JSON.stringify(updatedState));
-        const serializedData = JSON.stringify(selectionState);
-      console.log("Data size in bytes:", serializedData.length);
+        // Check localStorage for cached data
+        const localData = JSON.parse(localStorage.getItem(`selectionState_${userId}`) || "{}");
+        console.log("Local data for user:", userId, localData);
+
+        // Fetch data from MongoDB
+        const response = await fetch("/api/projects/draft");
+        const { data: mongoData } = await response.json();
+        console.log("MongoDB data:", mongoData);
+
+        if (mongoData) {
+          // Compare timestamps to determine which data is more recent
+          const localTimestamp = localData.updatedAt
+            ? new Date(localData.updatedAt).getTime()
+            : 0;
+          const mongoTimestamp = new Date(mongoData.updatedAt).getTime();
+
+          if (mongoTimestamp > localTimestamp) {
+            // Use MongoDB data if it's more recent
+            console.log("Using MongoDB data");
+            setSelectionState(mongoData);
+            localStorage.setItem(`selectionState_${userId}`, JSON.stringify(mongoData));
+          } else if (Object.keys(localData).length > 0) {
+            // Use localStorage data if it's more recent or equal
+            console.log("Using localStorage data");
+            setSelectionState(localData);
+          }
+        } else if (Object.keys(localData).length > 0) {
+          // Use localStorage data if no data in MongoDB
+          console.log("Using localStorage data (no MongoDB data)");
+          setSelectionState(localData);
+        }
+      } catch (error) {
+        console.error("Error fetching draft data:", error);
       }
-  
-
-      return updatedState;
-    });
-  };
-  
-  //formdata update function
-  const updateFormDataForImage = (imageId, newFormData) => {
-    updateSelectionState((prevState) => ({
-      ...prevState,
-      formData: {
-        ...prevState.formData,
-        [imageId]: newFormData,
-      },
-    }));
-  };
-
-
-  // Handle file upload by converting the file to base64
-  const handleFileUpload = (file) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64Data = reader.result;
-      updateSelectionState({
-        uploadedFiles: [
-          ...selectionState.uploadedFiles,
-          { fileName: file.name, fileData: base64Data }
-        ]
-      });
     };
-    reader.readAsDataURL(file); // Convert file to base64 string
-  };
 
-  // Convert SVG path to Base64
-  const convertSVGPathToBase64 = async (svgPath) => {
-    try {
-      const response = await fetch(svgPath);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch SVG: ${response.statusText}`);
+    fetchDraftData();
+  }, [userId]);
+
+  // Debounced function to save draft to MongoDB
+  const saveDraftToDatabase = useCallback(
+    debounce(async (state) => {
+      try {
+        console.log("Saving draft... TO DATABASE CONTEXT", state);
+        setIsSaving(true);
+        if (!userId) {
+          console.error("User ID is missing.");
+          return;
+        }
+
+        console.log("Saving draft for user:", userId, state);
+
+        await fetch("/api/projects/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...state, userId }),
+        });
+      } catch (error) {
+        console.error("Error saving draft:", error);
+      } finally {
+        setIsSaving(false);
       }
-      const svgContent = await response.text();
-      const encodedSVG = `data:image/svg+xml;base64,${btoa(svgContent)}`;
-      return encodedSVG;
-    } catch (error) {
-      console.error("Error converting SVG to base64:", error);
-    }
+    }, 1000), // 1-second debounce
+    [userId]
+  );
+
+// Update form data for Instagram media (adapted for formData array) without next key value
+const updateFormDataForMedia = (mediaId, newFormData) => {
+  const defaultFormData = {
+    key: "",
+    eventName: "",
+    eventLocation: "",
+    eventYear: "",
+    companyName: "",
+    companyLocation: "",
+    companyLogo: null,
+    companyLogoFileName: null,
+    description: "",
+    eventTypes: [],
+    industries: [],
+    titleName: "",
+    isDraft: true,
   };
 
-  // Add SVG selection
-  const addSVGSelection = async (project) => {
-    console.log("Adding SVG:", project);
-    const svgPath = project.path;
-    const name = project.name;
-    console.log("SVG Path:", svgPath);
+  setSelectionState((prevState) => {
+    // Ensure formData is an array
+    const formData = Array.isArray(prevState.formData) ? prevState.formData : [];
+
+    // Get the existing form data or create a new entry
+    const existingData = formData.find(item => item.key === mediaId) || { key: mediaId, ...defaultFormData };
+
+    console.log("Existing and new data:", existingData, newFormData);
+
+    // Merge existing and new data
+    const updatedFormData = Object.keys(defaultFormData).reduce((acc, key) => {
+      if (Array.isArray(existingData[key])) {
+        // Merge array fields and remove duplicates
+        acc[key] = [...new Set([...(existingData[key] || []), ...(newFormData[key] || [])])];
+      } else {
+        // Replace value instead of concatenating (Fixes repeated characters issue)
+        acc[key] = newFormData[key] !== undefined ? newFormData[key] : existingData[key];
+      }
+      return acc;
+    }, {});
+
+    // Update the state with new form data
+    const newState = {
+      ...prevState,
+      formData: [
+        ...formData.filter(item => item.key !== mediaId),  // Remove any existing entry with the same mediaId
+        {
+          key: mediaId,
+          ...updatedFormData,
+        },
+      ],
+    };
+
+    const timestamp = new Date().toISOString();
+
+    // Save to localStorage
+    localStorage.setItem(
+      `selectionState_${userId}`,
+      JSON.stringify({
+        ...newState,
+        updatedAt: timestamp,
+      })
+    );
+
+    // Auto-save to MongoDB
+    saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+
+    return newState;
+  });
+};
+
+
+// Add Instagram selection without map key
+const addInstagramSelection = (mediaLink, mediaId, name, children = []) => {
+  setSelectionState((prevState) => {
+    const newState = {
+      ...prevState,
+      instagramSelected: [
+        ...(prevState.instagramSelected || []),
+        {
+          id: Date.now(),
+          name,
+          mediaLink,
+          mediaId,
+          children,
+        },
+      ],
+    };
+
+    const timestamp = new Date().toISOString();
+
+    // Save to localStorage with updated Instagram selections
+    localStorage.setItem(
+      `selectionState_${userId}`,
+      JSON.stringify({
+        ...newState,
+        instagramSelected: [
+          ...(newState.instagramSelected || []),
+        ],
+        updatedAt: timestamp,
+      })
+    );
+
+    // Auto-save to MongoDB
+    saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+
+    return newState;
+  });
+};
+  const removeInstagramSelection = async (selectionId) => {
+    setSelectionState((prevState) => {
+      // Find the formData associated with the selectionId (if it exists)
+      const formDataToDelete = prevState.formData.find((item) => item.key === selectionId);
   
-    try {
-      const base64Image = await convertSVGPathToBase64(svgPath);
-      console.log("Base64 Image:", base64Image); // Debug base64 conversion
-  
-      // Append new SVG selection to the existing state
-      updateSelectionState((prevState) => {
-        const updatedSvgSelected = [
-          ...prevState.svgSelected,
-          { id: Date.now(), name, imageUrl: base64Image },
-        ];
-        console.log("Updated SVG Selected:", updatedSvgSelected); // Debug the updated SVG selection
-  
-        return {
-          ...prevState,
-          svgSelected: updatedSvgSelected,
-        };
+      console.log("Form data to delete: remove instagram", formDataToDelete, selectionId);
+    
+      // Filter out the deleted instagramSelected item with logging
+      const newInstagramSelected = prevState.instagramSelected.filter((selection) => {
+        console.log("Evaluating selection.mediaId:", selection.mediaId, "against selectionId:", selectionId);
+        return selection.mediaId !== selectionId;
       });
-    } catch (error) {
-      console.error("Failed to add SVG selection:", error);
-    }
-  };
-  ;
-
-   // Remove SVG selection
-   const removeSVGSelection = (selectionId) => {
-    updateSelectionState({
-      svgSelected: selectionState.svgSelected.filter(
-        (selection) => selection.id !== selectionId
-      )
+      console.log("New instagramSelected:", newInstagramSelected);
+    
+      // Filter out the formData that has the selectionId
+      const newFormData = prevState.formData.filter((item) => item.key !== selectionId);
+  
+      // Create the new state without the deleted instagramSelected and its formData
+      const newState = {
+        ...prevState,
+        instagramSelected: newInstagramSelected,
+        formData: newFormData, // Update the formData without the deleted entry
+      };
+    
+      const timestamp = new Date().toISOString();
+    
+      // Save to localStorage
+      localStorage.setItem(
+        `selectionState_${userId}`,
+        JSON.stringify({ ...newState, updatedAt: timestamp })
+      );
+    
+      // Auto-save to MongoDB
+      saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+    
+      return newState;
     });
+    
+    // Optionally, you can also explicitly delete the formData from the database
+    try {
+      await deleteFormDataFromDatabase(selectionId); // Call a function to delete formData from the database
+    } catch (error) {
+      console.error("Failed to delete formData from the database:", error);
+    }
   };
   
 
   // Remove uploaded file
   const removeFile = (fileName) => {
-    updateSelectionState({
-      uploadedFiles: selectionState.uploadedFiles.filter(
-        (file) => file.fileName !== fileName
-      )
+    setSelectionState((prevState) => {
+      const newState = {
+        ...prevState,
+        uploadedFiles: prevState.uploadedFiles.filter((file) => file.fileName !== fileName),
+      };
+
+      const timestamp = new Date().toISOString();
+
+      // Save to localStorage
+      localStorage.setItem(
+        `selectionState_${userId}`,
+        JSON.stringify({ ...newState, updatedAt: timestamp })
+      );
+
+      // Auto-save to MongoDB
+      saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+
+      return newState;
     });
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (file) => {
+    try {
+      const fileUrl = await cloudinaryUpload(file);
+      const mediaId = Date.now();
+      const media = {
+        mediaId,
+        fileName: file.name,
+        fileUrl,
+      };
+
+      setSelectionState((prevState) => {
+        const newState = {
+          ...prevState,
+          uploadedFiles: [...prevState.uploadedFiles, media],
+        };
+
+        const timestamp = new Date().toISOString();
+
+        // Save to localStorage
+        localStorage.setItem(
+          `selectionState_${userId}`,
+          JSON.stringify({ ...newState, updatedAt: timestamp })
+        );
+
+        // Auto-save to MongoDB
+        saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+
+        return newState;
+      });
+
+      console.log("File uploaded successfully:", media);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert("Error uploading file. Please try again.");
+    }
+  };
+
+  // Handle company logo upload
+  const handleCompanyLogoUpload = async (file, mediaId) => {
+    try {
+      const fileUrl = await cloudinaryUpload(file);
+      updateFormDataForMedia(mediaId, { companyLogo: fileUrl });
+      console.log("Company logo uploaded successfully. URL:", fileUrl);
+      return fileUrl;
+    } catch (error) {
+      console.error("Error uploading company logo:", error);
+      alert("Error uploading company logo. Please try again.");
+      throw error;
+    }
   };
 
   return (
     <SelectedProjectsContext.Provider
       value={{
         selectionState,
-        handleFileUpload,
-        addSVGSelection,
-        removeSVGSelection,
+        addInstagramSelection,
+        removeInstagramSelection,
         removeFile,
-        updateFormDataForImage
+        updateFormDataForMedia,
+        handleFileUpload,
+        handleCompanyLogoUpload,
+        isSaving,
       }}
     >
       {children}
@@ -173,42 +350,128 @@ export function SelectedProjectsProvider({ children }) {
 
 
 
+  // Add Instagram selection
+  // const addInstagramSelection = (mediaLink, mediaId, name, children = []) => {
+  //   setSelectionState((prevState) => {
+  //     const newState = {
+  //       ...prevState,
+  //       instagramSelected: [
+  //         ...(prevState.instagramSelected || []),
+  //         {
+  //           id: Date.now(),
+  //           name,
+  //           mediaLink,
+  //           mediaId,
+  //           children,
+  //         },
+  //       ],
+  //     };
 
-//   // // Convert image URL to Base64 (in prod)
-//   // const convertImageToBase64 = async (imageUrl) => {
-//   //   try {
-//   //     const response = await fetch(imageUrl);
-//   //     const blob = await response.blob();
-//   //     const reader = new FileReader();
-//   //     return new Promise((resolve, reject) => {
-//   //       reader.onloadend = () => {
-//   //         resolve(reader.result); 
-//   //       };
-//   //       reader.onerror = reject; 
-//   //       reader.readAsDataURL(blob); 
-//   //     });
-//   //   } catch (error) {
-//   //     console.error("Error converting image to base64:", error);
-//   //   }
-//   // };
+  //     const timestamp = new Date().toISOString();
 
-//     // Remove Instagram selection
-//   // const removeInstagramSelection = (selectionId) => {
-//   //   updateSelectionState({
-//   //     instagramSelected: selectionState.instagramSelected.filter(
-//   //       (selection) => selection.id !== selectionId
-//   //     )
-//   //   });
-//   // };
+  //     // Save to localStorage
+  //     localStorage.setItem(
+  //       `selectionState_${userId}`,
+  //       JSON.stringify({ ...newState, updatedAt: timestamp })
+  //     );
 
+  //     // Auto-save to MongoDB
+  //     saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+
+  //     return newState;
+  //   });
+  // };
+
+
+  //without dymanic map data addInstagramSelection
+  // const removeInstagramSelection = async (selectionId) => {
+  //   setSelectionState((prevState) => {
+  //     // Find the index of the formData object with the matching key (selectionId)
+  //     const formDataIndex = prevState.formData.findIndex((item) => item.key === selectionId);
   
-//   // // Add Instagram selection
-//   // const addInstagramSelection = async (imageUrl, name) => {
-//   //   const base64Image = await convertImageToBase64(imageUrl);
-//   //   updateSelectionState({
-//   //     instagramSelected: [
-//   //       ...selectionState.instagramSelected,
-//   //       { id: Date.now(), name, imageUrl: base64Image }
-//   //     ]
-//   //   });
-//   // }
+  //     // Log for debugging
+  //     console.log("Form data to delete:", prevState.formData[formDataIndex], selectionId);
+  
+  //     // Filter out the deleted instagramSelected item
+  //     const newInstagramSelected = prevState.instagramSelected.filter((selection) => {
+  //       return selection.mediaId !== selectionId;
+  //     });
+  //     console.log("New instagramSelected:", newInstagramSelected);
+  
+  //     // Create the new state without the deleted instagramSelected and its formData
+  //     const newState = {
+  //       ...prevState,
+  //       instagramSelected: newInstagramSelected,
+  //       formData: prevState.formData.filter((item, index) => index !== formDataIndex), // Remove the item at the found index
+  //     };
+  
+  //     const timestamp = new Date().toISOString();
+  
+  //     // Save to localStorage
+  //     localStorage.setItem(
+  //       `selectionState_${userId}`,
+  //       JSON.stringify({ ...newState, updatedAt: timestamp })
+  //     );
+  
+  //     // Auto-save to MongoDB
+  //     saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+  
+  //     return newState;
+  //   });
+  
+  //   // Optionally, you can also explicitly delete the formData from the database
+  //   try {
+  //     await deleteFormDataFromDatabase(selectionId); // Call a function to delete formData from the database
+  //   } catch (error) {
+  //     console.error("Failed to delete formData from the database:", error);
+  //   }
+  // };
+  
+
+
+  // const removeInstagramSelection = async (selectionId) => {
+  //   setSelectionState((prevState) => {
+  //     // Find the formData associated with the selectionId (if it exists)
+  //     const formDataToDelete = prevState.formData?.[selectionId];
+
+  //     console.log("Form data to delete: remove instgarm", formDataToDelete, selectionId);
+  
+  //     // Filter out the deleted instagramSelected item with logging
+  //     const newInstagramSelected = prevState.instagramSelected.filter((selection) => {
+  //       console.log("Evaluating selection.id:", selection.id, "against selectionId:", selectionId);
+  //       return selection.mediaId !== selectionId;
+  //     });
+  //     console.log("New instagramSelected:", newInstagramSelected);
+  
+  //     // Create the new state without the deleted instagramSelected and its formData
+  //     const newState = {
+  //       ...prevState,
+  //       instagramSelected: newInstagramSelected,
+  //       formData: {
+  //         ...prevState.formData,
+  //         [selectionId]: undefined, // Remove the formData for the deleted selection
+  //       },
+  //     };
+  
+  //     const timestamp = new Date().toISOString();
+  
+  //     // Save to localStorage
+  //     localStorage.setItem(
+  //       `selectionState_${userId}`,
+  //       JSON.stringify({ ...newState, updatedAt: timestamp })
+  //     );
+  
+  //     // Auto-save to MongoDB
+  //     saveDraftToDatabase({ ...newState, updatedAt: timestamp });
+  
+  //     return newState;
+  //   });
+  
+  //   // Optionally, you can also explicitly delete the formData from the database
+  //   try {
+  //     await deleteFormDataFromDatabase(selectionId); // Call a function to delete formData from the database
+  //   } catch (error) {
+  //     console.error("Failed to delete formData from the database:", error);
+  //   }
+  // };
+
