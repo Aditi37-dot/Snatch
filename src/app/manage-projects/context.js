@@ -20,78 +20,52 @@ export function SelectedProjectsProvider({ children }) {
     formData: {},
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isBrandCollaboration, setIsBrandCollaboration] = useState(true);
-  
+
   // Fetch draft data on initial load
   useEffect(() => {
     const fetchDraftData = async () => {
-    //   try {
-    //     if (!userId) {
-    //       console.error("User ID is missing.");
-    //       return;
-    //     }
+      try {
+        if (!userId) {
+          console.error("User ID is missing.");
+          return;
+        }
 
-    //     // Check localStorage for cached data
-    //     const localData = JSON.parse(localStorage.getItem(`selectionState_${userId}`) || "{}");
-    //     console.log("Local data for user:", userId, localData);
+        // Check localStorage for cached data
+        const localData = JSON.parse(localStorage.getItem(`selectionState_${userId}`) || "{}");
+        console.log("Local data for user:", userId, localData);
 
-    //     // Fetch data from MongoDB
-    //     const response = await fetch("/api/projects/draft");
-    //     const { data: mongoData } = await response.json();
-    //     console.log("MongoDB data:", mongoData);
+        // Fetch data from MongoDB
+        const response = await fetch("/api/projects/draft");
+        const { data: mongoData } = await response.json();
+        console.log("MongoDB data:", mongoData);
 
-    //     if (mongoData) {
-    //       // Compare timestamps to determine which data is more recent
-    //       const localTimestamp = localData.updatedAt
-    //         ? new Date(localData.updatedAt).getTime()
-    //         : 0;
-    //       const mongoTimestamp = new Date(mongoData.updatedAt).getTime();
+        if (mongoData) {
+          // Compare timestamps to determine which data is more recent
+          const localTimestamp = localData.updatedAt
+            ? new Date(localData.updatedAt).getTime()
+            : 0;
+          const mongoTimestamp = new Date(mongoData.updatedAt).getTime();
 
-    //       if (mongoTimestamp > localTimestamp) {
-    //         // Use MongoDB data if it's more recent
-    //         console.log("Using MongoDB data");
-    //         setSelectionState(mongoData);
-    //         localStorage.setItem(`selectionState_${userId}`, JSON.stringify(mongoData));
-    //       } else if (Object.keys(localData).length > 0) {
-    //         // Use localStorage data if it's more recent or equal
-    //         console.log("Using localStorage data");
-    //         setSelectionState(localData);
-    //       }
-    //     } else if (Object.keys(localData).length > 0) {
-    //       // Use localStorage data if no data in MongoDB
-    //       console.log("Using localStorage data (no MongoDB data)");
-    //       setSelectionState(localData);
-    //     }
-    //   } catch (error) {
-    //     console.error("Error fetching draft data:", error);
-    //   }
-    // };
-
-
-    try {
-      if (!userId) {
-        console.error("User ID is missing.");
-        return;
+          if (mongoTimestamp > localTimestamp) {
+            // Use MongoDB data if it's more recent
+            console.log("Using MongoDB data");
+            setSelectionState(mongoData);
+            localStorage.setItem(`selectionState_${userId}`, JSON.stringify(mongoData));
+          } else if (Object.keys(localData).length > 0) {
+            // Use localStorage data if it's more recent or equal
+            console.log("Using localStorage data");
+            setSelectionState(localData);
+          }
+        } else if (Object.keys(localData).length > 0) {
+          // Use localStorage data if no data in MongoDB
+          console.log("Using localStorage data (no MongoDB data)");
+          setSelectionState(localData);
+        }
+      } catch (error) {
+        console.error("Error fetching draft data:", error);
       }
-  
-      // Clear localStorage before fetching new data
-      localStorage.removeItem(`selectionState_${userId}`);
-  
-      // Fetch fresh data from MongoDB
-      const response = await fetch("/api/projects/draft");
-      const { data: mongoData } = await response.json();
-      console.log("MongoDB data:", mongoData);
-  
-      if (mongoData) {
-        setSelectionState(mongoData);
-        localStorage.setItem(`selectionState_${userId}`, JSON.stringify(mongoData));
-      }
-    } catch (error) {
-      console.error("Error fetching draft data:", error);
-    }
-  };
+    };
 
-  
     fetchDraftData();
   }, [userId]);
 
@@ -118,18 +92,12 @@ export function SelectedProjectsProvider({ children }) {
       } finally {
         setIsSaving(false);
       }
-    }, 7000), // 5-second debounce
+    }, 1000), // 1-second debounce
     [userId]
   );
 
-
-    const toggleIsBrandCollaboration = useCallback(() => {
-    setIsBrandCollaboration(prev => !prev);
-  }, []);
-
-
 // Update form data for Instagram media (adapted for formData array) without next key value
-const updateFormDataForMedia = (mediaId, newFormData, isBrandCollaboration) => {
+const updateFormDataForMedia = (mediaId, newFormData) => {
   const defaultFormData = {
     key: "",
     eventName: "",
@@ -144,7 +112,6 @@ const updateFormDataForMedia = (mediaId, newFormData, isBrandCollaboration) => {
     industries: [],
     titleName: "",
     isDraft: true,
-    isBrandCollaboration: true,
   };
 
   setSelectionState((prevState) => {
@@ -284,11 +251,11 @@ const addInstagramSelection = (mediaLink, mediaId, name, children = []) => {
   
 
   // Remove uploaded file
-  const removeFile = (mediaId) => {
+  const removeFile = (fileName) => {
     setSelectionState((prevState) => {
       const newState = {
         ...prevState,
-        uploadedFiles: prevState.uploadedFiles.filter((file) => file.mediaId !== mediaId),
+        uploadedFiles: prevState.uploadedFiles.filter((file) => file.fileName !== fileName),
       };
 
       const timestamp = new Date().toISOString();
@@ -368,9 +335,6 @@ const addInstagramSelection = (mediaLink, mediaId, name, children = []) => {
         updateFormDataForMedia,
         handleFileUpload,
         handleCompanyLogoUpload,
-        isBrandCollaboration, 
-        setIsBrandCollaboration,
-        toggleIsBrandCollaboration,
         isSaving,
       }}
     >
