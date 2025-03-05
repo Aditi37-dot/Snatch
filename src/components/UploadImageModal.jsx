@@ -1,17 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { fetchProfileData } from "@/utils/postQuestions";
 import Image from "next/image";
-export default function UploadImageModal({ isOpen, onClose, onImageSelect }) {
-  const [images] = useState([
-    "/assets/images/sample1.jpg",
-    "/assets/images/sample2.jpg",
-    "/assets/images/sample3.jpg",
-    "/assets/images/sample4.jpg",
-  ]);
+import clsx from "clsx";
 
-<<<<<<< HEAD
-=======
 // At the top of the file, add this mapping object
 const imageNameMapping = {
   "https://res.cloudinary.com/dgk9ok5fx/image/upload/v1740396552/7_r6djcr.jpg": "Sunlit Studio",
@@ -105,18 +98,15 @@ export default function UploadImageModal({ isOpen, onClose, onImageSelect, type,
     setTempSelectedImage(null);
   }, [isOpen]);
   
->>>>>>> 115cec2 (correction of profile about section bugs resolve)
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
       const imageUrl = URL.createObjectURL(file);
-      onImageSelect(imageUrl);
-      onClose(); 
+      setUploadedImages((prev) => [...prev, imageUrl]);
+      setSelectedImage(imageUrl);
     }
   };
 
-<<<<<<< HEAD
-=======
   // Find the handleImageSelect function and modify it:
   const handleImageSelect = (image) => {
     console.log("image", image);
@@ -150,12 +140,14 @@ export default function UploadImageModal({ isOpen, onClose, onImageSelect, type,
   // Add new confirmation handler
   const handleConfirmUpload = () => {
     if (tempSelectedImage) {
-      onImageSelect(tempSelectedImage.url); // Send to parent only on confirmation
+      onImageSelect({
+        url: tempSelectedImage.url,
+        name: tempSelectedImage.name || imageNameMapping[tempSelectedImage.url] || 'Selected Image'
+      }); // Send both URL and name to parent
       onClose();
     }
   };
 
->>>>>>> 115cec2 (correction of profile about section bugs resolve)
   return (
     <>
       {isOpen && (
@@ -163,53 +155,20 @@ export default function UploadImageModal({ isOpen, onClose, onImageSelect, type,
           <div className="bg-white rounded-lg shadow-lg p-6 w-[90%] max-w-2xl">
             {/* Modal Header */}
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Choose an Image</h2>
-              <button onClick={onClose} className="text-red-500 text-lg">
-                ×
+              <div className="flex flex-col">
+                <h2 className="text-3xl text-electric-blue font-qimano">
+                  Upload Background
+                </h2>
+                <p className="font-apfel-grotezk-regular text-gray-500">
+                  Select an image that sets with the vibe of your question
+                </p>
+              </div>
+              <button onClick={handleClose} className="text-red-500 text-lg ">
+                <Image src="/assets/images/close.svg" alt="Close" width={20} height={20} />
               </button>
             </div>
 
             {/* Image Collection */}
-<<<<<<< HEAD
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-              {images.map((image, index) => (
-                <div
-                  key={index}
-                  onClick={() => {
-                    onImageSelect(image);
-                    onClose();
-                  }}
-                  className="cursor-pointer border rounded-md overflow-hidden"
-                >
-                  <Image
-                    src={image}
-                    alt={`Image ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    width={24}
-                    height={24}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Choose from Device */}
-            <div className="text-center">
-              <p className="mb-4 text-gray-600">Choose from your device</p>
-              <label
-                htmlFor="file-upload"
-                className="cursor-pointer flex items-center justify-center w-24 h-24 border border-dashed border-gray-400 rounded-md"
-              >
-                <span className="text-gray-400 text-2xl">+</span>
-              </label>
-              <input
-                id="file-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </div>
-=======
             <div className="flex">
               <p className="font-qimano text-graphite">Choose from our collection</p>
               <div className="flex-1 ml-2 mt-2.5 border-t border-gray-200"></div>
@@ -239,7 +198,7 @@ export default function UploadImageModal({ isOpen, onClose, onImageSelect, type,
                   hovered ? "h-[100%]" : "h-[50%]"
                 )}
               >
-                <Image src={iconSrc || "/assets/images/about-icon.svg"} alt="about-icon" height={10} width={10} className="w-20 h-17 mt-1"/>
+                <Image src={iconSrc || "/assets/images/aboutIcon.svg"} alt="about-icon" height={10} width={10} className="w-20 h-17 mt-1"/>
                       <p className={clsx("text-center font-qimano", cardType.text)}>
                       {question}
                       </p>
@@ -300,15 +259,9 @@ export default function UploadImageModal({ isOpen, onClose, onImageSelect, type,
               <p className="font-apfel-grotezk-regular text-lg">Confirm Upload</p>
             </button>
 
->>>>>>> 115cec2 (correction of profile about section bugs resolve)
           </div>
         </div>
       )}
     </>
   );
-<<<<<<< HEAD
 }
-=======
-}
-
->>>>>>> 115cec2 (correction of profile about section bugs resolve)
