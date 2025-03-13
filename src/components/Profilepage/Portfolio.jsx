@@ -12,7 +12,7 @@ const Portfolio = () => {
         const response = await fetch("/api/projects/all-projects");
         const data = await response.json();
 
-        console.log("Project data in Portfolio:", data);
+        console.log("Project data in Portfolio: all projects from portfolio", data);
 
         if (data.success && data.instagram && data.uploaded) {
           // Process projects: For carousel albums, keep album details instead of flattening children.
